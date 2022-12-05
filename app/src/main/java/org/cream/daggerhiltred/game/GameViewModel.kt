@@ -20,42 +20,42 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.TtsSpan
 import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.*
+import kotlinx.coroutines.flow.*
 
 // TODO
 //  LiveData -> StateFlow
+//  = 코루틴을 쓰기 떄문에 라이브데이터보다 앱 성능이 향상되며 Flow API를 사용이 가능해 가능성이 풍부해짐
+//  ,
 //  SavedStateHandler 도입, 중요 데이터를 저장
 //  초기화 구문 개선
 
-class GameViewModel : ViewModel() {
-    private val _score = MutableLiveData(0)
-    val score: LiveData<Int>
+class GameViewModel() : ViewModel() {
+    private val _score = MutableStateFlow(0)
+    val score: StateFlow<Int>
         get() = _score
 
-    private val _currentWordCount = MutableLiveData(0)
-    val currentWordCount: LiveData<Int>
+    private val _currentWordCount = MutableStateFlow(0)
+    val currentWordCount: StateFlow<Int>
         get() = _currentWordCount
 
-    private val _currentScrambledWord = MutableLiveData<String>()
+    private val _currentScrambledWord = MutableStateFlow<String>("")
     //Spannable 특정문자를 볼드체로 한다든가 변경해주는거
-    val currentScrambledWord: LiveData<Spannable> = Transformations.map(_currentScrambledWord) {
-        if (it == null) {
-            SpannableString("")
-        } else {
-            val scrambledWord = it.toString()
-            val spannable: Spannable = SpannableString(scrambledWord)
-            spannable.setSpan(
+    val currentScrambledWord: StateFlow<Spannable> = _currentScrambledWord
+        // map -> 말그대로 형태 필터해서 바꾸는거
+        .map {
+                val scrambledWord = it.toString()
+                val spannable: Spannable = SpannableString(scrambledWord)
+                spannable.setSpan(
                     TtsSpan.VerbatimBuilder(scrambledWord).build(),
                     0,
                     scrambledWord.length,
                     Spannable.SPAN_INCLUSIVE_INCLUSIVE
-            )
-            spannable
+                )
+                spannable
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpannableString(""))
+
 
     // List of words used in the game
     private var wordsList: MutableList<String> = mutableListOf()
@@ -83,7 +83,7 @@ class GameViewModel : ViewModel() {
             Log.d("Unscramble", "currentWord= $currentWord")
             // 셔플로 뒤석인 단어들을 저장
             _currentScrambledWord.value = String(tempWord)
-            _currentWordCount.value = _currentWordCount.value?.inc()
+            _currentWordCount.value = _currentWordCount.value.inc()
             wordsList.add(currentWord)
         }
     }
@@ -102,7 +102,7 @@ class GameViewModel : ViewModel() {
     * Increases the game score if the player’s word is correct.
     */
     private fun increaseScore() {
-        _score.value = _score.value?.plus(SCORE_INCREASE)
+        _score.value = _score.value.plus(SCORE_INCREASE)
     }
 
     /*

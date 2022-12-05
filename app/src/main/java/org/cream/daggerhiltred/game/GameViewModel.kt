@@ -22,26 +22,52 @@ import android.text.style.TtsSpan
 import android.util.Log
 import androidx.lifecycle.*
 import kotlinx.coroutines.flow.*
+import java.util.*
+import kotlin.random.Random
 
 // TODO
 //  LiveData -> StateFlow
 //  = 코루틴을 쓰기 떄문에 라이브데이터보다 앱 성능이 향상되며 Flow API를 사용이 가능해 가능성이 풍부해짐
 //  ,
 //  SavedStateHandler 도입, 중요 데이터를 저장
+//  ,
 //  초기화 구문 개선
 
-class GameViewModel() : ViewModel() {
-    private val _score = MutableStateFlow(0)
+class SaveableMutableStateFlow<T> (
+    private val savedStateHandle: SavedStateHandle,
+    private val key: String,
+    initialValue:T
+) {
+    private val state: StateFlow<T> = savedStateHandle.getStateFlow(key, initialValue)
+    var value: T
+        get() = state.value
+        set(value) {
+            savedStateHandle[key] = value
+        }
+    fun asStatedFlow(): StateFlow<T> = state
+}
+
+fun <T> SavedStateHandle.getMutableStateFlow(key: String, initialValue: T): SaveableMutableStateFlow<T> =
+    SaveableMutableStateFlow(this, key, initialValue)
+
+class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
+    private val _score = stateHandler.getMutableStateFlow("score", 0)
     val score: StateFlow<Int>
-        get() = _score
+        get() = _score.asStatedFlow()
 
-    private val _currentWordCount = MutableStateFlow(0)
+    /*private val _score = stateHandler.getStateFlow("score", 0)
+    private fun setScore(value: Int) {
+        stateHandler["score"] = value
+    }*/
+
+    private val _currentWordCount = stateHandler.getMutableStateFlow("currentWordCount", 0)
     val currentWordCount: StateFlow<Int>
-        get() = _currentWordCount
+        get() = _currentWordCount.asStatedFlow()
 
-    private val _currentScrambledWord = MutableStateFlow<String>("")
+    private val _currentScrambledWord = stateHandler.getMutableStateFlow("currentScrambledWord", "")
     //Spannable 특정문자를 볼드체로 한다든가 변경해주는거
     val currentScrambledWord: StateFlow<Spannable> = _currentScrambledWord
+        .asStatedFlow()
         // map -> 말그대로 형태 필터해서 바꾸는거
         .map {
                 val scrambledWord = it.toString()
@@ -69,7 +95,7 @@ class GameViewModel() : ViewModel() {
      * Updates currentWord and currentScrambledWord with the next word.
      */
     private fun getNextWord() {
-        currentWord = allWordsList.random()
+        currentWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
         val tempWord = currentWord.toCharArray()
         // 말그대로 단어 섞게 하는거
         tempWord.shuffle()

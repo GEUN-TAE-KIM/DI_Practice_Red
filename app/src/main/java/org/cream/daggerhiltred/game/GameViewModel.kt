@@ -33,10 +33,10 @@ import kotlin.random.Random
 //  ,
 //  초기화 구문 개선
 
-class SaveableMutableStateFlow<T> (
+class SaveableMutableStateFlow<T>(
     private val savedStateHandle: SavedStateHandle,
     private val key: String,
-    initialValue:T
+    initialValue: T
 ) {
     private val state: StateFlow<T> = savedStateHandle.getStateFlow(key, initialValue)
     var value: T
@@ -44,10 +44,14 @@ class SaveableMutableStateFlow<T> (
         set(value) {
             savedStateHandle[key] = value
         }
+
     fun asStatedFlow(): StateFlow<T> = state
 }
 
-fun <T> SavedStateHandle.getMutableStateFlow(key: String, initialValue: T): SaveableMutableStateFlow<T> =
+fun <T> SavedStateHandle.getMutableStateFlow(
+    key: String,
+    initialValue: T
+): SaveableMutableStateFlow<T> =
     SaveableMutableStateFlow(this, key, initialValue)
 
 class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
@@ -65,54 +69,68 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
         get() = _currentWordCount.asStatedFlow()
 
     private val _currentScrambledWord = stateHandler.getMutableStateFlow("currentScrambledWord", "")
+
     //Spannable 특정문자를 볼드체로 한다든가 변경해주는거
     val currentScrambledWord: StateFlow<Spannable> = _currentScrambledWord
         .asStatedFlow()
+        .onSubscription {
+            if (currentWord.isEmpty())
+            nextWord()
+        }
         // map -> 말그대로 형태 필터해서 바꾸는거
         .map {
-                val scrambledWord = it.toString()
-                val spannable: Spannable = SpannableString(scrambledWord)
-                spannable.setSpan(
-                    TtsSpan.VerbatimBuilder(scrambledWord).build(),
-                    0,
-                    scrambledWord.length,
-                    Spannable.SPAN_INCLUSIVE_INCLUSIVE
-                )
-                spannable
+            val scrambledWord = it.toString()
+            val spannable: Spannable = SpannableString(scrambledWord)
+            spannable.setSpan(
+                TtsSpan.VerbatimBuilder(scrambledWord).build(),
+                0,
+                scrambledWord.length,
+                Spannable.SPAN_INCLUSIVE_INCLUSIVE
+            )
+            spannable
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpannableString(""))
 
 
     // List of words used in the game
-    private var wordsList: MutableList<String> = mutableListOf()
-    private lateinit var currentWord: String
+    private var wordsList: List<String>
+        get() = stateHandler["wordsList"] ?: emptyList()
+        set(value) {
+            stateHandler["wordsList"] = value
+        }
 
-    init {
-        getNextWord()
-    }
+    private var currentWord: String
+        get() = stateHandler["currentWord"] ?: ""
+        set(value) {
+
+            val tempWord = value.toCharArray()
+            // 말그대로 단어 섞게 하는거
+            do {
+                tempWord.shuffle()
+            } while (String(tempWord) == value)
+
+            Log.d("Unscramble", "currentWord= $currentWord")
+            // 셔플로 뒤석인 단어들을 저장
+            _currentScrambledWord.value = String(tempWord)
+            _currentWordCount.value += 1
+            wordsList = wordsList + currentWord
+
+            stateHandler["currentWord"] = value
+        }
 
     /*
      * Updates currentWord and currentScrambledWord with the next word.
      */
-    private fun getNextWord() {
-        currentWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
-        val tempWord = currentWord.toCharArray()
-        // 말그대로 단어 섞게 하는거
-        tempWord.shuffle()
+   /* private fun getNextWord() {
 
-        while (String(tempWord).equals(currentWord, false)) {
-            tempWord.shuffle()
-        }
-        if (wordsList.contains(currentWord)) {
-            getNextWord()
-        } else {
-            Log.d("Unscramble", "currentWord= $currentWord")
-            // 셔플로 뒤석인 단어들을 저장
-            _currentScrambledWord.value = String(tempWord)
-            _currentWordCount.value = _currentWordCount.value.inc()
-            wordsList.add(currentWord)
-        }
-    }
+        var nextWord: String
+
+        do {
+            nextWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
+        } while (wordsList.contains(currentWord))
+        currentWord = nextWord
+
+    }*/
 
     /*
      * Re-initializes the game data to restart the game.
@@ -120,15 +138,15 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
     fun reinitializeData() {
         _score.value = 0
         _currentWordCount.value = 0
-        wordsList.clear()
-        getNextWord()
+        wordsList = emptyList()
+        nextWord()
     }
 
     /*
     * Increases the game score if the player’s word is correct.
     */
     private fun increaseScore() {
-        _score.value = _score.value.plus(SCORE_INCREASE)
+        _score.value += SCORE_INCREASE
     }
 
     /*
@@ -147,8 +165,14 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
     * Returns true if the current word count is less than MAX_NO_OF_WORDS
     */
     fun nextWord(): Boolean {
-        return if (_currentWordCount.value!! < MAX_NO_OF_WORDS) {
-            getNextWord()
+        return if (_currentWordCount.value < MAX_NO_OF_WORDS) {
+            var nextWord: String
+
+            do {
+                nextWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
+            } while (wordsList.contains(currentWord))
+            currentWord = nextWord
+
             true
         } else false
     }

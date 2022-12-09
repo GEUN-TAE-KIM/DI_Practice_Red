@@ -16,12 +16,17 @@
 
 package org.cream.daggerhiltred.game
 
+import android.app.Application
+import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.TtsSpan
 import android.util.Log
 import androidx.lifecycle.*
+import androidx.savedstate.SavedStateRegistryOwner
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import org.cream.daggerhiltred.data.GameRepository
 import java.util.*
 import kotlin.random.Random
 
@@ -54,10 +59,18 @@ fun <T> SavedStateHandle.getMutableStateFlow(
 ): SaveableMutableStateFlow<T> =
     SaveableMutableStateFlow(this, key, initialValue)
 
-class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
+class GameViewModel(
+    private val stateHandler: SavedStateHandle,
+    private val repository: GameRepository
+) : ViewModel() {
+
     private val _score = stateHandler.getMutableStateFlow("score", 0)
     val score: StateFlow<Int>
         get() = _score.asStatedFlow()
+
+    val highScore: StateFlow<Int> = repository.highScore.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(), 0
+    )
 
     /*private val _score = stateHandler.getStateFlow("score", 0)
     private fun setScore(value: Int) {
@@ -75,7 +88,7 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
         .asStatedFlow()
         .onSubscription {
             if (currentWord.isEmpty())
-            nextWord()
+                nextWord()
         }
         // map -> 말그대로 형태 필터해서 바꾸는거
         .map {
@@ -109,7 +122,7 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
                 tempWord.shuffle()
             } while (String(tempWord) == value)
 
-            Log.d("Unscramble", "currentWord= $currentWord")
+            Log.d("Unscramble", "currentWord= $value")
             // 셔플로 뒤석인 단어들을 저장
             _currentScrambledWord.value = String(tempWord)
             _currentWordCount.value += 1
@@ -121,16 +134,16 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
     /*
      * Updates currentWord and currentScrambledWord with the next word.
      */
-   /* private fun getNextWord() {
+    /* private fun getNextWord() {
 
-        var nextWord: String
+         var nextWord: String
 
-        do {
-            nextWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
-        } while (wordsList.contains(currentWord))
-        currentWord = nextWord
+         do {
+             nextWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
+         } while (wordsList.contains(currentWord))
+         currentWord = nextWord
 
-    }*/
+     }*/
 
     /*
      * Re-initializes the game data to restart the game.
@@ -147,6 +160,10 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
     */
     private fun increaseScore() {
         _score.value += SCORE_INCREASE
+
+        viewModelScope.launch {
+            repository.updateScore(_score.value)
+        }
     }
 
     /*
@@ -176,4 +193,27 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
             true
         } else false
     }
+}
+
+class GameViewModelFactory(
+    private val application: Application, owner: SavedStateRegistryOwner,
+    defaultArgs: Bundle? = null
+) :
+    AbstractSavedStateViewModelFactory(owner,defaultArgs) {
+
+    override fun <T : ViewModel> create(
+        key: String,
+        modelClass: Class<T>,
+        handle: SavedStateHandle
+    ): T {
+        require(modelClass.isAssignableFrom(GameViewModel::class.java)) {
+            "Unknown ViewModel class"
+        }
+        @Suppress("UNCHECKED_CAST")
+        return GameViewModel(
+            stateHandler = handle,
+            repository = GameRepository(application)
+        ) as T
+    }
+
 }

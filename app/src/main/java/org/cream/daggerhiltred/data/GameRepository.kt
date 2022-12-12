@@ -4,12 +4,11 @@ import android.app.Application
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
-class GameRepository(
-    application: Application,
-    private val dataSources: GameDataSources = GameDataSources(application)
+class GameRepository @Inject constructor(
+    private val dataSources: GameDataSources
 ) {
-
     val highScore: Flow<Int> =
         dataSources.gamePreferencesFlow.map { preferences -> preferences.highScore }
 

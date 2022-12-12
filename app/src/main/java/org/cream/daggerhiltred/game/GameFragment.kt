@@ -17,6 +17,7 @@
 package org.cream.daggerhiltred.game
 
 import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -24,22 +25,25 @@ import android.view.ViewGroup
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import org.cream.daggerhiltred.MainActivity
 import org.cream.daggerhiltred.R
 import org.cream.daggerhiltred.databinding.GameFragmentBinding
+import javax.inject.Inject
 
 /**
  * Fragment where the game is played, contains the game logic.
  */
+@AndroidEntryPoint
 class GameFragment : Fragment() {
 
     // Binding object instance with access to the views in the game_fragment.xml layout
     private lateinit var binding: GameFragmentBinding
 
     // by viewModels()는 기본 팩토리를 만들어줌
-    private val viewModel: GameViewModel by viewModels {
-        GameViewModelFactory(requireContext().applicationContext as Application, this)
-    }
+    private val viewModel: GameViewModel by viewModels ()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,

@@ -24,6 +24,7 @@ import android.text.style.TtsSpan
 import android.util.Log
 import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistryOwner
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.cream.daggerhiltred.data.GameRepository
@@ -60,6 +61,7 @@ fun <T> SavedStateHandle.getMutableStateFlow(
 ): SaveableMutableStateFlow<T> =
     SaveableMutableStateFlow(this, key, initialValue)
 
+@HiltViewModel
 class GameViewModel @Inject constructor(
     private val stateHandler: SavedStateHandle,
     private val repository: GameRepository

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.cream.daggerhiltred.data.GameRepository
 import java.util.*
+import javax.inject.Inject
 import kotlin.random.Random
 
 // TODO
@@ -59,7 +60,7 @@ fun <T> SavedStateHandle.getMutableStateFlow(
 ): SaveableMutableStateFlow<T> =
     SaveableMutableStateFlow(this, key, initialValue)
 
-class GameViewModel(
+class GameViewModel @Inject constructor(
     private val stateHandler: SavedStateHandle,
     private val repository: GameRepository
 ) : ViewModel() {
@@ -195,7 +196,7 @@ class GameViewModel(
     }
 }
 
-class GameViewModelFactory(
+/*class GameViewModelFactory(
     private val application: Application, owner: SavedStateRegistryOwner,
     defaultArgs: Bundle? = null
 ) :
@@ -216,4 +217,4 @@ class GameViewModelFactory(
         ) as T
     }
 
-}
+}*/
